@@ -52,3 +52,10 @@ describe('helpers', () => {
     expect(toCSV([['a', 'b,c']])).toBe('﻿a,"b,c"')
   })
 })
+
+describe('toCSV กันสูตร Excel', () => {
+  it("ใส่ ' นำหน้าข้อความที่ขึ้นต้นด้วย = + - @ แต่ไม่ยุ่งกับตัวเลข", () => {
+    const out = toCSV([['=HYPERLINK("x")', '+1', '@a', 'สมชาย', -1]]).replace(/^﻿/, '')
+    expect(out).toBe(`"'=HYPERLINK(""x"")",'+1,'@a,สมชาย,-1`)
+  })
+})

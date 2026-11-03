@@ -68,6 +68,14 @@ export default function EntryPage() {
   const del = useDeleteSubmissions(subjectId, classroomId)
   const saving = useIsMutating() > 0
 
+  // เตือนก่อนปิด/รีเฟรชหน้า ถ้ายังบันทึกคะแนนไม่เสร็จ
+  useEffect(() => {
+    if (!saving) return
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [saving])
+
   const [entryDate, setEntryDate] = useState<ISODate>(todayISO)
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')

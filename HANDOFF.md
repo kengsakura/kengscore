@@ -27,6 +27,10 @@ Vite 7 + React 19 + react-router 7 + TanStack Query 5 + Tailwind 4 + TypeScript,
   - ต้องรัน `supabase/migrations/20261103000000_init.sql` แล้วตามด้วย `20261104000000_student_portal.sql`
   - ตั้ง Auth → URL Configuration: Site URL = https://kengscore-ochre.vercel.app, Redirect = `https://kengscore-ochre.vercel.app/**`
 
+## ใช้คนเดียว
+- ผู้ใช้เป็นครูคนเดียว → หน้า login ไม่มีปุ่มสมัคร และควรปิด Supabase → Authentication → Sign In / Providers → **Allow new users to sign up**
+- หน้าตั้งค่ามี **สำรองข้อมูล** (ดาวน์โหลด/กู้คืน JSON ทุกตาราง, `src/lib/backup.ts`) เพราะแพ็กเกจฟรีไม่มี backup
+
 ## GitHub
 - repo เดิม `sarawutjamornniam-coder/kengscore` — บัญชีโดน flag (repo ถูกซ่อน, Actions ใช้ไม่ได้, เชื่อม Vercel ไม่ได้)
 - ย้ายมา `kengsakura/kengscore` และเชื่อมกับ Vercel project `kengscore` แล้ว (2026-11-03)
@@ -36,7 +40,7 @@ Vite 7 + React 19 + react-router 7 + TanStack Query 5 + Tailwind 4 + TypeScript,
 ```bash
 npm install
 npm run dev          # รันในเครื่อง (ไม่มี .env = โหมดเดโม่)
-npm test             # vitest (36 tests)
+npm test             # vitest
 npm run build
 npm run build:artifact   # build ไฟล์เดียวสำหรับพรีวิว
 scripts/test-db.sh   # ทดสอบ SQL/RLS กับ Postgres ในเครื่อง

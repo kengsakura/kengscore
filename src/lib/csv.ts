@@ -37,7 +37,9 @@ export function parseDelimited(text: string): string[][] {
 
 export function toCSV(rows: (string | number | null | undefined)[][]): string {
   const esc = (v: string | number | null | undefined) => {
-    const s = v == null ? '' : String(v)
+    let s = v == null ? '' : String(v)
+    // กันสูตร Excel แทรก (CSV injection): ข้อความที่ขึ้นต้นด้วย = + - @ ให้ใส่ ' นำหน้า
+    if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }
   // BOM ให้ Excel อ่านภาษาไทยถูก

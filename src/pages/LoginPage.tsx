@@ -5,20 +5,17 @@ import { getSupabase, setDemoMode } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Form'
 import { Logo } from '@/components/ui/Feedback'
-import { Segmented } from '@/components/ui/Misc'
 import { errorMessage } from '@/lib/utils'
 
 function authError(e: unknown) {
   const msg = errorMessage(e)
   if (/Invalid login credentials/i.test(msg)) return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
   if (/Email not confirmed/i.test(msg)) return 'ยังไม่ได้ยืนยันอีเมล กรุณาเปิดลิงก์ในอีเมลก่อน'
-  if (/already registered/i.test(msg)) return 'อีเมลนี้สมัครไว้แล้ว ลองเข้าสู่ระบบ'
   if (/Password should be at least/i.test(msg)) return 'รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร'
   return msg
 }
 
 export default function LoginPage() {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -29,18 +26,8 @@ export default function LoginPage() {
     setBusy(true)
     const sb = getSupabase()
     try {
-      if (mode === 'signin') {
-        const { error } = await sb.auth.signInWithPassword({ email, password })
-        if (error) throw error
-      } else {
-        const { data, error } = await sb.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: window.location.origin },
-        })
-        if (error) throw error
-        if (!data.session) setSent(`ส่งลิงก์ยืนยันไปที่ ${email} แล้ว กรุณาเปิดอีเมลเพื่อยืนยันบัญชี`)
-      }
+      const { error } = await sb.auth.signInWithPassword({ email, password })
+      if (error) throw error
     } catch (err) {
       toast.error(authError(err))
     } finally {
@@ -79,15 +66,6 @@ export default function LoginPage() {
             </div>
           ) : (
             <form onSubmit={submit} className="space-y-4">
-              <Segmented
-                className="w-full [&>button]:flex-1 [&>button]:justify-center"
-                value={mode}
-                onChange={setMode}
-                options={[
-                  { value: 'signin', label: 'เข้าสู่ระบบ' },
-                  { value: 'signup', label: 'สมัครใช้งาน' },
-                ]}
-              />
               <Field label="อีเมล" htmlFor="email">
                 <div className="relative">
                   <Mail className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
@@ -109,24 +87,22 @@ export default function LoginPage() {
                   <Input
                     id="password"
                     type="password"
-                    autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                    autoComplete="current-password"
                     required
                     minLength={6}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-9"
-                    placeholder="อย่างน้อย 6 ตัวอักษร"
+                    placeholder="รหัสผ่าน"
                   />
                 </div>
               </Field>
               <Button type="submit" variant="primary" size="lg" className="w-full" loading={busy}>
-                {mode === 'signin' ? 'เข้าสู่ระบบ' : 'สร้างบัญชี'}
+                เข้าสู่ระบบ
               </Button>
-              {mode === 'signin' && (
-                <button type="button" onClick={forgot} className="block w-full text-center text-sm text-slate-500 hover:text-indigo-600">
-                  ลืมรหัสผ่าน?
-                </button>
-              )}
+              <button type="button" onClick={forgot} className="block w-full text-center text-sm text-slate-500 hover:text-indigo-600">
+                ลืมรหัสผ่าน?
+              </button>
             </form>
           )}
         </div>
@@ -135,7 +111,7 @@ export default function LoginPage() {
           onClick={() => setDemoMode(true)}
           className="mx-auto mt-5 flex items-center gap-1.5 text-sm text-slate-500 hover:text-indigo-600"
         >
-          <FlaskConical className="size-4" /> ทดลองใช้โหมดสาธิต (ไม่ต้องสมัคร)
+          <FlaskConical className="size-4" /> ทดลองใช้โหมดสาธิต
         </button>
       </div>
     </div>

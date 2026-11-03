@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useLocation } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowDown, ArrowUp, CalendarRange, Check, Copy, GraduationCap, KeyRound, LogOut, Printer, RotateCcw, Tags, Timer, Trash2, UserRound, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, CalendarRange, Check, Copy, DatabaseBackup, Download, Upload, GraduationCap, KeyRound, LogOut, Printer, RotateCcw, Tags, Timer, Trash2, UserRound, X } from 'lucide-react'
 import { Link } from 'react-router'
 import { portalUrl } from '@/lib/access'
 import { useApp } from '@/context/AppContext'
@@ -13,7 +13,8 @@ import { ARTIFACT } from '@/lib/env'
 import { resetDemoData } from '@/lib/api/local'
 import type { LatePolicy } from '@/lib/api/types'
 import { normalizePolicy } from '@/lib/scoring'
-import { cn, copyText, errorMessage, suggestTerm, termLabel, termLongLabel } from '@/lib/utils'
+import { backupCounts, createBackup, parseBackup, restoreBackup } from '@/lib/backup'
+import { cn, copyText, downloadFile, errorMessage, suggestTerm, termLabel, termLongLabel } from '@/lib/utils'
 import { LatePolicyForm } from '@/components/LatePolicyForm'
 import { Button, buttonClass } from '@/components/ui/Button'
 import { ChipGroup, Field, Input } from '@/components/ui/Form'
@@ -57,6 +58,7 @@ export default function SettingsPage() {
         <div className="space-y-4">
           <LatePolicySection />
           <PortalSection />
+          <BackupSection />
           <AccountSection />
         </div>
       </div>
@@ -305,6 +307,116 @@ function PortalSection() {
           <Printer className="size-4" /> พิมพ์ใบรหัส + QR
         </Link>
       </div>
+    </Section>
+  )
+}
+
+const LAST_BACKUP_KEY = 'kengscore:last-backup'
+
+function readLastBackup(): string | null {
+  try {
+    return localStorage.getItem(LAST_BACKUP_KEY)
+  } catch {
+    return null
+  }
+}
+
+function BackupSection() {
+  const { demo } = useApp()
+  const qc = useQueryClient()
+  const confirm = useConfirm()
+  const [busy, setBusy] = useState<string | null>(null)
+  const [last, setLast] = useState(readLastBackup)
+  if (demo) return null
+
+  const daysAgo = last ? Math.floor((Date.now() - new Date(last).getTime()) / 86_400_000) : null
+  const stale = daysAgo == null || daysAgo >= 14
+
+  async function download() {
+    setBusy('กำลังสำรองข้อมูล…')
+    try {
+      const backup = await createBackup(getSupabase())
+      const stamp = backup.created_at.slice(0, 10)
+      downloadFile(`kengscore-backup-${stamp}.json`, JSON.stringify(backup), 'application/json')
+      try {
+        localStorage.setItem(LAST_BACKUP_KEY, backup.created_at)
+      } catch {
+        /* ignore */
+      }
+      setLast(backup.created_at)
+      const c = backupCounts(backup)
+      toast.success(`สำรองแล้ว: นักเรียน ${c.students} คน · งาน ${c.assignments} ชิ้น · คะแนน ${c.submissions} รายการ`)
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function restore(file: File) {
+    try {
+      const backup = parseBackup(await file.text())
+      const c = backupCounts(backup)
+      const ok = await confirm({
+        title: 'กู้คืนข้อมูลจากไฟล์สำรอง?',
+        message: (
+          <>
+            <p>
+              ไฟล์วันที่ {new Date(backup.created_at).toLocaleString('th-TH')} — ภาคเรียน {c.terms} · นักเรียน {c.students} คน · วิชา {c.subjects} · งาน{' '}
+              {c.assignments} · คะแนน {c.submissions} รายการ
+            </p>
+            <p className="mt-2">ข้อมูลในไฟล์จะทับข้อมูลเดิมที่ตรงกัน ส่วนข้อมูลที่มีอยู่แต่ไม่อยู่ในไฟล์จะยังอยู่ ไม่ถูกลบ</p>
+          </>
+        ),
+        confirmText: 'กู้คืน',
+      })
+      if (!ok) return
+      const sb = getSupabase()
+      const { data } = await sb.auth.getSession()
+      const uid = data.session?.user.id
+      if (!uid) throw new Error('กรุณาเข้าสู่ระบบใหม่')
+      setBusy('กำลังกู้คืน…')
+      await restoreBackup(sb, backup, uid, (t) => setBusy(`กำลังกู้คืน ${t}…`))
+      await qc.invalidateQueries()
+      toast.success('กู้คืนข้อมูลเรียบร้อย')
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <Section
+      id="backup"
+      icon={<DatabaseBackup />}
+      title="สำรองข้อมูล"
+      description="Supabase แพ็กเกจฟรีไม่มีระบบสำรองให้ — ดาวน์โหลดเก็บไว้เป็นระยะ (เช่น ทุกสิ้นเดือน)"
+    >
+      <p className={cn('mb-3 text-sm', stale ? 'text-amber-700' : 'text-slate-500')}>
+        {last
+          ? `สำรองล่าสุดจากเครื่องนี้: ${new Date(last).toLocaleDateString('th-TH', { dateStyle: 'medium' })}${daysAgo ? ` (${daysAgo} วันก่อน)` : ' (วันนี้)'}`
+          : 'ยังไม่เคยสำรองข้อมูลจากเครื่องนี้'}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="primary" icon={<Download className="size-4" />} onClick={download} loading={busy?.startsWith('กำลังสำรอง')} disabled={!!busy}>
+          ดาวน์โหลดไฟล์สำรอง
+        </Button>
+        <label className={cn(buttonClass('soft'), busy ? 'pointer-events-none opacity-50' : 'cursor-pointer')}>
+          <Upload className="size-4" /> กู้คืนจากไฟล์
+          <input
+            type="file"
+            accept="application/json,.json"
+            className="sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              e.target.value = ''
+              if (f) restore(f)
+            }}
+          />
+        </label>
+      </div>
+      {busy && <p className="mt-2 text-sm text-slate-500">{busy}</p>}
     </Section>
   )
 }
