@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { BookOpen, Download, Printer } from 'lucide-react'
+import { BookOpen, Download, Layers, Printer } from 'lucide-react'
 import { useApp } from '@/context/AppContext'
-import { useAssignments, useClassrooms, useDueDates, useRoomStudents, useRoomSubmissions, useSubjects } from '@/hooks/queries'
+import { useAssignments, useClassrooms, useDueDates, useGroups, useRoomStudents, useRoomSubmissions, useSubjects } from '@/hooks/queries'
 import type { Assignment } from '@/lib/api/types'
 import { toCSV } from '@/lib/csv'
-import { buildGradebook, sortByCategory, type GradeCell, type GradeRow } from '@/lib/gradebook'
+import { buildGradebook, columnMax, sortByCategory, type GradeCell, type GradeRow, type MainColumn } from '@/lib/gradebook'
+import { ScoreGroupsModal } from '@/components/ScoreGroupsModal'
 import { classroomLabel, cn, downloadFile, fmtDate, fmtDateShort, fmtScore, studentName, termLongLabel } from '@/lib/utils'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { ARTIFACT } from '@/lib/env'
@@ -13,7 +14,7 @@ import { EmptyState, PageLoader } from '@/components/ui/Feedback'
 import { Checkbox, Select } from '@/components/ui/Form'
 import { PageHeader, Segmented } from '@/components/ui/Misc'
 
-type View = 'detail' | 'category'
+type View = 'main' | 'detail' | 'category'
 
 const pct = (v: number, max: number) => (max > 0 ? Math.round((v / max) * 1000) / 10 : 0)
 
@@ -26,7 +27,8 @@ function gradeTone(p: number) {
 export default function SummaryPage() {
   const { term, settings } = useApp()
   const [params, setParams] = useSearchParams()
-  const [view, setView] = useState<View>('detail')
+  const [viewChoice, setView] = useState<View | null>(null)
+  const [groupsOpen, setGroupsOpen] = useState(false)
   const [onlyMissing, setOnlyMissing] = useState(false)
 
   const subjectsQ = useSubjects(term.id)
@@ -40,6 +42,8 @@ export default function SummaryPage() {
   const assignmentsQ = useAssignments(subject?.id)
   const dueDatesQ = useDueDates(subject?.id)
   const subsQ = useRoomSubmissions(subject?.id, room?.id, studentsQ.data, studentsQ.isSuccess)
+  const groupsQ = useGroups(subject?.id)
+  const scoreGroups = useMemo(() => groupsQ.data ?? [], [groupsQ.data])
 
   const assignments = useMemo(
     () => sortByCategory(assignmentsQ.data ?? [], settings.categories),
@@ -47,8 +51,8 @@ export default function SummaryPage() {
   )
   const book = useMemo(
     () =>
-      buildGradebook(studentsQ.data, assignments, subsQ.data ?? [], dueDatesQ.data ?? [], room?.id ?? '', settings.late_policy),
-    [studentsQ.data, assignments, subsQ.data, dueDatesQ.data, room?.id, settings.late_policy],
+      buildGradebook(studentsQ.data, assignments, subsQ.data ?? [], dueDatesQ.data ?? [], room?.id ?? '', settings.late_policy, scoreGroups),
+    [studentsQ.data, assignments, subsQ.data, dueDatesQ.data, room?.id, settings.late_policy, scoreGroups],
   )
   const groups = useMemo(() => {
     const out: { category: string; items: Assignment[] }[] = []
@@ -81,6 +85,9 @@ export default function SummaryPage() {
     setParams(next, { replace: true })
   }
 
+  const hasGroups = book.columns.some((c) => c.kind === 'group')
+  const view: View = viewChoice === 'main' && !hasGroups ? 'detail' : (viewChoice ?? (hasGroups ? 'main' : 'detail'))
+  const colLabel = (c: MainColumn) => (c.kind === 'group' ? c.group.name : c.assignment.title)
   const full = subject.full_score
   const rows = onlyMissing ? book.rows.filter((r) => r.missing > 0) : book.rows
   const loading = studentsQ.isPending || assignmentsQ.isPending || subsQ.isPending
@@ -99,6 +106,7 @@ export default function SummaryPage() {
     if (!subject || !room) return
     const header = ['เลขที่', 'เลขประจำตัว', 'ชื่อ-สกุล']
     if (view === 'detail') assignments.forEach((a) => header.push(`${a.title} (${fmtScore(a.max_score)})`))
+    else if (view === 'main') book.columns.forEach((c) => header.push(`${colLabel(c)} (${fmtScore(columnMax(c))})`))
     else groups.forEach((g) => header.push(`${g.category} (${fmtScore(g.items.reduce((n, a) => n + a.max_score, 0))})`))
     header.push(`รวม (${fmtScore(book.maxTotal)})`, 'ร้อยละ')
     if (full) header.push(`คิดเป็น (${fmtScore(full)})`)
@@ -106,6 +114,7 @@ export default function SummaryPage() {
     const body = rows.map((r) => {
       const line: (string | number)[] = [r.student.number ?? '', r.student.student_code, studentName(r.student)]
       if (view === 'detail') r.cells.forEach((c) => line.push(c.result ? c.result.final : ''))
+      else if (view === 'main') r.main.forEach((m) => line.push(m.score))
       else categoryTotals(r).forEach((t) => line.push(Math.round(t.score * 100) / 100))
       line.push(r.total, pct(r.total, r.max))
       if (full) line.push(book.maxTotal ? Math.round((r.total / book.maxTotal) * full * 100) / 100 : 0)
@@ -123,6 +132,9 @@ export default function SummaryPage() {
         subtitle={termLongLabel(term)}
         actions={
           <>
+            <Button icon={<Layers className="size-4" />} onClick={() => setGroupsOpen(true)} disabled={assignments.length === 0}>
+              รวมคะแนนย่อย
+            </Button>
             {!ARTIFACT && (
               <Button icon={<Printer className="size-4" />} onClick={() => window.print()}>
                 พิมพ์
@@ -157,12 +169,15 @@ export default function SummaryPage() {
           value={view}
           onChange={setView}
           options={[
-            { value: 'detail', label: 'รายงาน' },
-            { value: 'category', label: 'ตามประเภท' },
+            ...(hasGroups ? [{ value: 'main' as const, label: 'คะแนนหลัก' }] : []),
+            { value: 'detail' as const, label: 'รายงาน' },
+            { value: 'category' as const, label: 'ตามประเภท' },
           ]}
         />
         <Checkbox className="ml-1" label="เฉพาะคนที่ค้างงาน" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} />
       </div>
+
+      <ScoreGroupsModal open={groupsOpen} onClose={() => setGroupsOpen(false)} subjectId={subject.id} assignments={assignments} groups={scoreGroups} />
 
       {/* หัวกระดาษตอนพิมพ์ */}
       <div className="mb-3 hidden text-sm print:block">
@@ -207,7 +222,20 @@ export default function SummaryPage() {
                   <th className="sticky left-12 z-10 min-w-44 border-r border-b border-slate-200 bg-slate-50 px-3 py-2 text-left font-medium sm:min-w-56">
                     ชื่อ-สกุล
                   </th>
-                  {view === 'detail'
+                  {view === 'main'
+                    ? book.columns.map((c) => (
+                        <th
+                          key={c.kind === 'group' ? c.group.id : c.assignment.id}
+                          className={cn('min-w-20 border-b border-l border-slate-200 px-2 py-2 align-bottom font-medium', c.kind === 'group' && 'bg-violet-50')}
+                          title={c.kind === 'group' ? c.members.map((a) => a.title).join(', ') : c.assignment.title}
+                        >
+                          <div className={cn('line-clamp-2 leading-tight', c.kind === 'group' ? 'text-violet-800' : 'text-slate-700')}>{colLabel(c)}</div>
+                          <div className="mt-0.5 font-normal text-slate-400">
+                            {c.kind === 'group' ? `${c.members.length} งาน · ` : ''}/{fmtScore(columnMax(c))}
+                          </div>
+                        </th>
+                      ))
+                    : view === 'detail'
                     ? book.stats.map((st) => (
                         <th key={st.assignment.id} className="w-20 max-w-24 border-b border-l border-slate-200 px-1.5 py-2 align-bottom font-medium" title={`${st.assignment.title} · ส่ง ${fmtDate(st.due)}`}>
                           <div className="line-clamp-2 leading-tight text-slate-700">{st.assignment.title}</div>
@@ -250,7 +278,18 @@ export default function SummaryPage() {
                         <div className="truncate font-medium text-slate-900">{studentName(r.student)}</div>
                         {r.student.student_code && <div className="text-[11px] text-slate-400">{r.student.student_code}</div>}
                       </td>
-                      {view === 'detail'
+                      {view === 'main'
+                        ? r.main.map((m, i) => (
+                            <td key={i} className={cn('tabular border-b border-l border-slate-100 px-2 py-2 text-center group-hover:bg-slate-50', book.columns[i].kind === 'group' && 'bg-violet-50/40')}>
+                              {book.columns[i].kind === 'assignment' && m.missing ? (
+                                <span className="text-rose-400">–</span>
+                              ) : (
+                                <span className="font-medium">{fmtScore(m.score)}</span>
+                              )}
+                              {book.columns[i].kind === 'group' && m.missing > 0 && <div className="text-[11px] text-rose-500">ขาด {m.missing}</div>}
+                            </td>
+                          ))
+                        : view === 'detail'
                         ? r.cells.map((c) => <ScoreCell key={c.assignment.id} cell={c} />)
                         : categoryTotals(r).map((t, i) => (
                             <td key={i} className="tabular border-b border-l border-slate-100 px-2 py-2 text-center group-hover:bg-slate-50">
@@ -309,6 +348,7 @@ export default function SummaryPage() {
               <span className="size-3 rounded bg-amber-50 ring-1 ring-amber-200" /> ส่งช้า (หักแล้ว)
             </span>
             <span>คะแนนในตารางเป็นคะแนนสุทธิหลังหักส่งช้า · ชี้ที่ช่องเพื่อดูรายละเอียด</span>
+            {hasGroups && <span className="text-violet-700">"รวม" คิดจากคะแนนหลัก (กลุ่มคะแนน + งานเดี่ยว)</span>}
           </div>
         </>
       )}

@@ -8,7 +8,7 @@ import type { Assignment, LatePolicy } from '@/lib/api/types'
 import { describePolicy, normalizePolicy } from '@/lib/scoring'
 import { cn, errorMessage, parseNumber, suggestTitle, todayISO } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
-import { Field, Input } from '@/components/ui/Form'
+import { ChipGroup, Field, Input } from '@/components/ui/Form'
 import { Modal } from '@/components/ui/Modal'
 import { LatePolicyForm } from './LatePolicyForm'
 
@@ -65,7 +65,10 @@ function AssignmentForm({
   const [titleTouched, setTitleTouched] = useState(!!assignment)
   const [max, setMax] = useState(String(assignment?.max_score ?? lastMax(initialCategory) ?? 10))
   const [due, setDue] = useState(assignment?.due_date ?? todayISO())
-  const [customPolicy, setCustomPolicy] = useState(!!assignment?.late_policy)
+  type PolicyChoice = 'default' | 'none' | 'custom'
+  const [choice, setChoice] = useState<PolicyChoice>(
+    !assignment?.late_policy ? 'default' : assignment.late_policy.mode === 'none' ? 'none' : 'custom',
+  )
   const [policy, setPolicy] = useState<LatePolicy>(normalizePolicy(assignment?.late_policy ?? settings.late_policy))
   const [busy, setBusy] = useState(false)
 
@@ -94,7 +97,12 @@ function AssignmentForm({
         title: title.trim(),
         max_score: maxScore,
         due_date: due || todayISO(),
-        late_policy: customPolicy ? policy : null,
+        late_policy:
+          choice === 'default'
+            ? null
+            : choice === 'none'
+              ? { ...normalizePolicy(policy), mode: 'none' as const }
+              : { ...policy, mode: policy.mode === 'none' ? ('percent' as const) : policy.mode },
       }
       let saved: Assignment
       if (assignment) {
@@ -103,7 +111,7 @@ function AssignmentForm({
       } else {
         saved = await api.createAssignment(payload)
       }
-      await qc.invalidateQueries({ queryKey: qk.assignments(subjectId) })
+      await Promise.all([qc.invalidateQueries({ queryKey: qk.assignments(subjectId) }), qc.invalidateQueries({ queryKey: ['termAssignments'] })])
       toast.success(assignment ? 'บันทึกการแก้ไขแล้ว' : `สร้าง "${saved.title}" แล้ว`)
       onDone()
       onSaved?.(saved)
@@ -177,23 +185,28 @@ function AssignmentForm({
       </div>
 
       <div className="rounded-2xl ring-1 ring-slate-200 ring-inset">
-        <label className="flex cursor-pointer items-start gap-3 p-4">
-          <input
-            type="checkbox"
-            className="mt-0.5 size-4.5 accent-indigo-600"
-            checked={customPolicy}
-            onChange={(e) => setCustomPolicy(e.target.checked)}
+        <div className="p-4">
+          <div className="mb-2 text-sm font-medium">การหักคะแนนส่งช้าของงานนี้</div>
+          <ChipGroup
+            value={choice}
+            onChange={setChoice}
+            options={[
+              { value: 'default', label: 'ตามค่าเริ่มต้น' },
+              { value: 'none', label: 'ไม่หักงานนี้' },
+              { value: 'custom', label: 'กำหนดเอง' },
+            ]}
           />
-          <span>
-            <span className="block text-sm font-medium">กำหนดการหักคะแนนส่งช้าเฉพาะงานนี้</span>
-            <span className="block text-xs text-slate-500">
-              {customPolicy ? 'ตั้งค่าด้านล่าง' : `ใช้ค่าเริ่มต้น: ${describePolicy(settings.late_policy)}`}
-            </span>
-          </span>
-        </label>
-        {customPolicy && (
+          <p className="mt-2 text-xs text-slate-500">
+            {choice === 'default'
+              ? `ใช้ค่าเริ่มต้นในหน้าตั้งค่า: ${describePolicy(settings.late_policy)}`
+              : choice === 'none'
+                ? 'งานนี้ไม่หักคะแนนส่งช้า ไม่ว่าค่าเริ่มต้นจะเป็นอย่างไร'
+                : 'ตั้งค่าด้านล่าง ใช้เฉพาะงานนี้'}
+          </p>
+        </div>
+        {choice === 'custom' && (
           <div className="border-t border-slate-100 p-4">
-            <LatePolicyForm value={policy} onChange={setPolicy} />
+            <LatePolicyForm value={policy} onChange={setPolicy} hideOff />
           </div>
         )}
       </div>

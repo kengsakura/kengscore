@@ -3,7 +3,8 @@ import { computeScore, describePolicy } from '@/lib/scoring'
 import { addDays, cn, fmtScore } from '@/lib/utils'
 import { Checkbox, ChipGroup, Field, Input, Select } from '@/components/ui/Form'
 
-export function LatePolicyForm({ value, onChange }: { value: LatePolicy; onChange: (p: LatePolicy) => void }) {
+export function LatePolicyForm({ value: valueIn, onChange, hideOff }: { value: LatePolicy; onChange: (p: LatePolicy) => void; hideOff?: boolean }) {
+  const value = hideOff && valueIn.mode === 'none' ? { ...valueIn, mode: 'percent' as const } : valueIn
   const set = (patch: Partial<LatePolicy>) => onChange({ ...value, ...patch })
   const num = (s: string) => (s === '' ? 0 : Math.max(0, Number(s)))
   const off = value.mode === 'none'
@@ -19,9 +20,9 @@ export function LatePolicyForm({ value, onChange }: { value: LatePolicy; onChang
         value={value.mode}
         onChange={(mode) => set({ mode })}
         options={[
-          { value: 'none', label: 'ไม่หักคะแนน' },
-          { value: 'percent', label: 'หักเป็น %' },
-          { value: 'points', label: 'หักเป็นคะแนน' },
+          ...(hideOff ? [] : [{ value: 'none' as const, label: 'ไม่หักคะแนน' }]),
+          { value: 'percent' as const, label: 'หักเป็น %' },
+          { value: 'points' as const, label: 'หักเป็นคะแนน' },
         ]}
       />
       <div className={cn('space-y-4', off && 'pointer-events-none opacity-40')}>

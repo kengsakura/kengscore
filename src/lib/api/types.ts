@@ -83,8 +83,25 @@ export interface Assignment {
   due_date: ISODate
   late_policy: LatePolicy | null
   created_at: string
+  /** กลุ่มคะแนนที่งานนี้ถูกรวมเข้าไป (null = งานเดี่ยว) */
+  group_id?: UUID | null
 }
-export type AssignmentInput = Omit<Assignment, 'id' | 'created_at'>
+export type AssignmentInput = Omit<Assignment, 'id' | 'created_at' | 'group_id'>
+
+/** กลุ่มคะแนน: รวมคะแนนเก็บย่อยหลายงานเป็นคะแนนหลักก้อนเดียว */
+export interface ScoreGroup {
+  id: UUID
+  subject_id: UUID
+  name: string
+  max_score: number
+  created_at: string
+}
+export interface ScoreGroupInput {
+  subject_id: UUID
+  name: string
+  max_score: number
+  assignment_ids: UUID[]
+}
 
 /** กำหนดส่งเฉพาะห้อง (override จาก assignment.due_date) */
 export interface DueDate {
@@ -180,6 +197,14 @@ export interface Api {
   createAssignment(input: AssignmentInput): Promise<Assignment>
   updateAssignment(id: UUID, patch: Partial<AssignmentInput>): Promise<void>
   deleteAssignment(id: UUID): Promise<void>
+  /** งานทุกชิ้นในภาคเรียน (ทุกวิชา) */
+  listTermAssignments(termId: UUID): Promise<Assignment[]>
+
+  /** กลุ่มคะแนนของวิชา (ถ้ายังไม่ได้รัน migration กลุ่มคะแนน จะได้ []) */
+  listGroups(subjectId: UUID): Promise<ScoreGroup[]>
+  /** สร้าง/แก้กลุ่ม แล้วกำหนดงานที่อยู่ในกลุ่มตาม assignment_ids */
+  saveGroup(input: ScoreGroupInput, id?: UUID): Promise<void>
+  deleteGroup(id: UUID): Promise<void>
 
   listDueDates(subjectId: UUID): Promise<DueDate[]>
   /** due_date = null → ลบ override (กลับไปใช้กำหนดส่งหลัก) */

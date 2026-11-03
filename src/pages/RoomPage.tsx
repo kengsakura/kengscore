@@ -67,6 +67,8 @@ export default function RoomPage() {
       await getApi().deleteAssignment(a.id)
       await Promise.all([
         qc.invalidateQueries({ queryKey: qk.assignments(subjectId) }),
+        qc.invalidateQueries({ queryKey: ['termAssignments'] }),
+        qc.invalidateQueries({ queryKey: qk.groups(subjectId) }),
         qc.invalidateQueries({ queryKey: ['submissions', subjectId] }),
         qc.invalidateQueries({ queryKey: qk.dueDates(subjectId) }),
       ])

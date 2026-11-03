@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router'
-import { BookOpen, ChevronDown, ClipboardCheck, FlaskConical, Home, LogOut, Settings, Sheet, Users } from 'lucide-react'
+import { BookOpen, ChevronDown, ClipboardCheck, FlaskConical, Home, ListChecks, LogOut, Settings, Sheet, Users } from 'lucide-react'
 import { useApp } from '@/context/AppContext'
 import { useAuth } from '@/context/AuthContext'
 import { setDemoMode } from '@/lib/api'
@@ -11,6 +11,7 @@ const NAV = [
   { to: '/', label: 'หน้าหลัก', short: 'หน้าหลัก', icon: Home, end: true },
   { to: '/scores', label: 'กรอกคะแนน', short: 'กรอกคะแนน', icon: ClipboardCheck },
   { to: '/summary', label: 'คะแนนรวม', short: 'คะแนนรวม', icon: Sheet },
+  { to: '/followup', label: 'ติดตามงานค้าง', short: 'งานค้าง', icon: ListChecks },
   { to: '/students', label: 'นักเรียน', short: 'นักเรียน', icon: Users },
   { to: '/subjects', label: 'รายวิชาและห้อง', short: 'รายวิชา', icon: BookOpen },
 ]
@@ -143,7 +144,7 @@ export default function AppShell() {
       </main>
 
       {/* Bottom nav (mobile) */}
-      <nav className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-slate-200/80 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden">
+      <nav className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-slate-200/80 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden">
         {NAV.map(({ to, short, icon: Icon, end }) => (
           <NavLink
             key={to}
@@ -151,14 +152,14 @@ export default function AppShell() {
             end={end}
             className={({ isActive }) =>
               cn(
-                'flex flex-col items-center gap-0.5 pt-2 pb-1.5 text-[11px] font-medium transition-colors',
+                'flex min-w-0 flex-col items-center gap-0.5 pt-2 pb-1.5 text-[10.5px] font-medium whitespace-nowrap transition-colors',
                 isActive ? 'text-indigo-600' : 'text-slate-500',
               )
             }
           >
             {({ isActive }) => (
               <>
-                <span className={cn('rounded-full px-4 py-1 transition-colors', isActive && 'bg-indigo-50')}>
+                <span className={cn('rounded-full px-3 py-1 transition-colors', isActive && 'bg-indigo-50')}>
                   <Icon className="size-5" />
                 </span>
                 {short}

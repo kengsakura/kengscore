@@ -15,6 +15,8 @@ export const qk = {
   assignments: (subjectId?: UUID) => ['assignments', subjectId] as const,
   dueDates: (subjectId?: UUID) => ['dueDates', subjectId] as const,
   submissions: (subjectId?: UUID, classroomId?: UUID) => ['submissions', subjectId, classroomId] as const,
+  groups: (subjectId?: UUID) => ['groups', subjectId] as const,
+  termAssignments: (termId?: UUID) => ['termAssignments', termId] as const,
 }
 
 const api = () => getApi()
@@ -60,6 +62,22 @@ export function useAssignments(subjectId?: UUID) {
     queryKey: qk.assignments(subjectId),
     queryFn: () => api().listAssignments(subjectId!),
     enabled: !!subjectId,
+  })
+}
+
+export function useGroups(subjectId?: UUID) {
+  return useQuery({
+    queryKey: qk.groups(subjectId),
+    queryFn: () => api().listGroups(subjectId!),
+    enabled: !!subjectId,
+  })
+}
+
+export function useTermAssignments(termId?: UUID) {
+  return useQuery({
+    queryKey: qk.termAssignments(termId),
+    queryFn: () => api().listTermAssignments(termId!),
+    enabled: !!termId,
   })
 }
 

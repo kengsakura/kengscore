@@ -237,7 +237,7 @@ export default function StudentsPage() {
                   รหัสดูคะแนน
                 </Button>
                 <Button icon={<Download className="size-4" />} onClick={exportCSV} disabled={list.length === 0}>
-                  ส่งออก CSV
+                  ดาวน์โหลดรายชื่อ
                 </Button>
               </>
             )}

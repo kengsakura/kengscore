@@ -12,10 +12,11 @@ export const BACKUP_TABLES = [
   { name: 'students', key: 'id' },
   { name: 'subjects', key: 'id' },
   { name: 'subject_classrooms', key: 'subject_id,classroom_id' },
+  { name: 'score_groups', key: 'id', optional: true },
   { name: 'assignments', key: 'id' },
   { name: 'assignment_due_dates', key: 'assignment_id,classroom_id' },
   { name: 'submissions', key: 'id' },
-] as const
+] as const satisfies readonly { name: string; key: string; optional?: boolean }[]
 
 export type BackupTable = (typeof BACKUP_TABLES)[number]['name']
 type Row = Record<string, unknown>
@@ -38,6 +39,7 @@ export async function createBackup(sb: SupabaseClient): Promise<Backup> {
       let q = sb.from(t.name).select('*')
       for (const col of t.key.split(',')) q = q.order(col)
       const { data, error } = await q.range(from, from + PAGE - 1)
+      if (error && 'optional' in t && ['42P01', 'PGRST205'].includes(error.code)) break
       if (error) throw new Error(`อ่านตาราง ${t.name} ไม่สำเร็จ: ${error.message}`)
       rows.push(...(data ?? []))
       if (!data || data.length < PAGE) break
@@ -59,6 +61,7 @@ export function parseBackup(text: string): Backup {
     throw new Error('ไฟล์นี้ไม่ใช่ไฟล์สำรองของ KengScore')
   }
   for (const t of BACKUP_TABLES) {
+    if ('optional' in t && b.tables[t.name] == null) b.tables[t.name] = []
     if (!Array.isArray(b.tables[t.name])) throw new Error(`ไฟล์สำรองไม่มีตาราง ${t.name}`)
   }
   return b as Backup
@@ -81,6 +84,7 @@ export function backupCounts(b: Backup) {
 export async function restoreBackup(sb: SupabaseClient, backup: Backup, ownerId: string, onProgress?: (table: string) => void) {
   for (const t of BACKUP_TABLES) {
     const rows = backup.tables[t.name].map((r) => ({ ...r, owner_id: ownerId }))
+    if (rows.length === 0) continue
     onProgress?.(t.name)
     for (let i = 0; i < rows.length; i += CHUNK) {
       const { error } = await sb.from(t.name).upsert(rows.slice(i, i + CHUNK), { onConflict: t.key })

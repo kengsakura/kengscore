@@ -14,6 +14,7 @@ const ScoresIndexPage = lazy(() => import('@/pages/ScoresIndexPage'))
 const RoomPage = lazy(() => import('@/pages/RoomPage'))
 const EntryPage = lazy(() => import('@/pages/EntryPage'))
 const SummaryPage = lazy(() => import('@/pages/SummaryPage'))
+const FollowUpPage = lazy(() => import('@/pages/FollowUpPage'))
 const StudentsPage = lazy(() => import('@/pages/StudentsPage'))
 const SlipsPage = lazy(() => import('@/pages/SlipsPage'))
 const SubjectsPage = lazy(() => import('@/pages/SubjectsPage'))
@@ -56,6 +57,7 @@ function TeacherApp() {
                 <Route path="scores/:subjectId/:classroomId" element={<RoomPage />} />
                 <Route path="scores/:subjectId/:classroomId/:assignmentId" element={<EntryPage />} />
                 <Route path="summary" element={<SummaryPage />} />
+                <Route path="followup" element={<FollowUpPage />} />
                 <Route path="students" element={<StudentsPage />} />
                 <Route path="students/slips" element={<SlipsPage />} />
                 <Route path="subjects" element={<SubjectsPage />} />

@@ -4,6 +4,7 @@ import type {
   Assignment,
   Classroom,
   DueDate,
+  ScoreGroup,
   Settings,
   Student,
   StudentReport,
@@ -26,6 +27,7 @@ export interface LocalDB {
   assignments: Assignment[]
   due_dates: DueDate[]
   submissions: Submission[]
+  groups: ScoreGroup[]
 }
 
 const KEY = 'kengscore:demo-db:v1'
@@ -48,6 +50,7 @@ export function emptyDB(): LocalDB {
     assignments: [],
     due_dates: [],
     submissions: [],
+    groups: [],
   }
 }
 
@@ -115,6 +118,7 @@ export function createLocalApi(): Api {
   }
   function cascadeDeleteSubjects(ids: Set<string>) {
     db.subjects = db.subjects.filter((s) => !ids.has(s.id))
+    db.groups = db.groups.filter((g) => !ids.has(g.subject_id))
     db.subject_classrooms = db.subject_classrooms.filter((x) => !ids.has(x.subject_id))
     cascadeDeleteAssignments(new Set(db.assignments.filter((a) => ids.has(a.subject_id)).map((a) => a.id)))
   }
@@ -275,6 +279,35 @@ export function createLocalApi(): Api {
     },
     async deleteAssignment(id) {
       cascadeDeleteAssignments(new Set([id]))
+      save()
+    },
+    async listTermAssignments(termId) {
+      await tick()
+      const subs = new Set(db.subjects.filter((s) => s.term_id === termId).map((s) => s.id))
+      return clone(db.assignments.filter((a) => subs.has(a.subject_id)))
+    },
+
+    async listGroups(subjectId) {
+      await tick()
+      return clone(db.groups.filter((g) => g.subject_id === subjectId).sort((a, b) => a.created_at.localeCompare(b.created_at)))
+    },
+    async saveGroup({ assignment_ids, ...input }, id) {
+      let g = id ? db.groups.find((x) => x.id === id) : undefined
+      if (g) Object.assign(g, { name: input.name, max_score: input.max_score })
+      else {
+        g = { id: uid(), ...input, created_at: new Date().toISOString() }
+        db.groups.push(g)
+      }
+      const members = new Set(assignment_ids)
+      for (const a of db.assignments) {
+        if (a.group_id === g.id && !members.has(a.id)) a.group_id = null
+        if (members.has(a.id)) a.group_id = g.id
+      }
+      save()
+    },
+    async deleteGroup(id) {
+      db.groups = db.groups.filter((g) => g.id !== id)
+      for (const a of db.assignments) if (a.group_id === id) a.group_id = null
       save()
     },
 

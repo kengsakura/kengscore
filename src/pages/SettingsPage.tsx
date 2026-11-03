@@ -7,12 +7,12 @@ import { Link } from 'react-router'
 import { portalUrl } from '@/lib/access'
 import { useApp } from '@/context/AppContext'
 import { useAuth } from '@/context/AuthContext'
-import { qk, useUpdateSettings } from '@/hooks/queries'
+import { qk, useTermAssignments, useUpdateSettings } from '@/hooks/queries'
 import { getApi, getSupabase, reloadHome, setDemoMode } from '@/lib/api'
 import { ARTIFACT } from '@/lib/env'
 import { resetDemoData } from '@/lib/api/local'
 import type { LatePolicy } from '@/lib/api/types'
-import { normalizePolicy } from '@/lib/scoring'
+import { describePolicy, normalizePolicy } from '@/lib/scoring'
 import { backupCounts, createBackup, parseBackup, restoreBackup } from '@/lib/backup'
 import { cn, copyText, downloadFile, errorMessage, suggestTerm, termLabel, termLongLabel } from '@/lib/utils'
 import { LatePolicyForm } from '@/components/LatePolicyForm'
@@ -244,28 +244,74 @@ function CategoriesSection() {
 }
 
 function LatePolicySection() {
-  const { settings } = useApp()
+  const { settings, term } = useApp()
   const update = useUpdateSettings()
+  const qc = useQueryClient()
+  const confirm = useConfirm()
+  const termAssignments = useTermAssignments(term.id)
   const [policy, setPolicy] = useState<LatePolicy>(normalizePolicy(settings.late_policy))
-  const dirty = JSON.stringify(policy) !== JSON.stringify(normalizePolicy(settings.late_policy))
+  const saved = JSON.stringify(normalizePolicy(settings.late_policy))
+  const dirty = JSON.stringify(policy) !== saved
+
+  // บันทึกอัตโนมัติ (ไม่ต้องกดปุ่ม) — รอให้หยุดพิมพ์ครู่หนึ่งก่อน
+  const { mutate } = update
+  useEffect(() => {
+    if (!dirty) return
+    const t = setTimeout(() => mutate({ late_policy: policy }, { onSuccess: () => toast.success('บันทึกการหักคะแนนแล้ว', { id: 'late-policy' }) }), 500)
+    return () => clearTimeout(t)
+  }, [policy, dirty, mutate])
+
+  const custom = (termAssignments.data ?? []).filter((a) => a.late_policy)
+  const customDeducting = custom.filter((a) => a.late_policy?.mode !== 'none')
+
+  async function resetCustom() {
+    const ok = await confirm({
+      title: `ให้ทั้ง ${custom.length} งานใช้ค่าเริ่มต้น?`,
+      message: 'งานที่เคยตั้งการหักคะแนนเฉพาะไว้ (รวมถึงที่ตั้ง "ไม่หักงานนี้") จะกลับมาใช้ค่าเริ่มต้นด้านบน',
+      confirmText: 'ใช้ค่าเริ่มต้นทุกงาน',
+    })
+    if (!ok) return
+    try {
+      await Promise.all(custom.map((a) => getApi().updateAssignment(a.id, { late_policy: null })))
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['assignments'] }),
+        qc.invalidateQueries({ queryKey: qk.termAssignments(term.id) }),
+      ])
+      toast.success('ทุกงานใช้ค่าเริ่มต้นแล้ว')
+    } catch (err) {
+      toast.error(errorMessage(err))
+    }
+  }
+
   return (
-    <Section icon={<Timer />} title="การหักคะแนนส่งช้า (ค่าเริ่มต้น)" description="ใช้กับทุกงาน ยกเว้นงานที่ตั้งค่าเฉพาะไว้ — เปลี่ยนแล้วคะแนนสุทธิคำนวณใหม่ทันที">
+    <Section icon={<Timer />} title="การหักคะแนนส่งช้า (ค่าเริ่มต้น)" description="ใช้กับทุกงาน ยกเว้นงานที่ตั้งค่าเฉพาะไว้ — เปลี่ยนแล้วบันทึกและคำนวณคะแนนใหม่ทันที">
       <LatePolicyForm value={policy} onChange={setPolicy} />
-      <div className="mt-4 flex justify-end gap-2">
-        {dirty && (
-          <Button icon={<RotateCcw className="size-4" />} onClick={() => setPolicy(normalizePolicy(settings.late_policy))}>
-            ยกเลิก
-          </Button>
+      <div className="mt-3 text-right text-xs text-slate-500">
+        {update.isPending || dirty ? 'กำลังบันทึก…' : (
+          <span className="inline-flex items-center gap-1 text-emerald-700">
+            <Check className="size-3.5" /> บันทึกแล้ว
+          </span>
         )}
-        <Button
-          variant="primary"
-          disabled={!dirty}
-          loading={update.isPending}
-          onClick={() => update.mutate({ late_policy: policy }, { onSuccess: () => toast.success('บันทึกนโยบายแล้ว') })}
-        >
-          บันทึก
-        </Button>
       </div>
+      {custom.length > 0 && (
+        <div className={cn('mt-3 rounded-xl p-3 text-sm ring-1 ring-inset', customDeducting.length && policy.mode === 'none' ? 'bg-amber-50 text-amber-900 ring-amber-200' : 'bg-slate-50 text-slate-700 ring-slate-200')}>
+          <p>
+            มี <b>{custom.length}</b> งานในภาคเรียนนี้ที่ตั้งการหักคะแนนเฉพาะไว้ จึง<b>ไม่ใช้</b>ค่าเริ่มต้นนี้
+            {customDeducting.length > 0 && policy.mode === 'none' && ` — ${customDeducting.length} งานยังหักคะแนนอยู่`}
+          </p>
+          <ul className="mt-1 list-inside list-disc text-xs text-slate-600">
+            {custom.slice(0, 5).map((a) => (
+              <li key={a.id}>
+                {a.title} — {describePolicy(a.late_policy!)}
+              </li>
+            ))}
+            {custom.length > 5 && <li>และอีก {custom.length - 5} งาน</li>}
+          </ul>
+          <Button size="sm" className="mt-2" onClick={resetCustom}>
+            ให้ทุกงานใช้ค่าเริ่มต้น
+          </Button>
+        </div>
+      )}
     </Section>
   )
 }

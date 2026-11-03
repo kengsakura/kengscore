@@ -6,6 +6,7 @@ import type {
   StudentReport,
   Assignment,
   Classroom,
+  ScoreGroup,
   DueDate,
   Settings,
   Student,
@@ -70,8 +71,15 @@ function toSettings(row: Settings): Settings {
     portal_enabled: row.portal_enabled ?? true,
   }
 }
-function toAssignment(row: Assignment): Assignment {
-  return { ...row, max_score: Number(row.max_score) }
+function toAssignment(row: Assignment & { owner_id?: unknown; subjects?: unknown }): Assignment {
+  const { owner_id: _o, subjects: _s, ...rest } = row
+  return { ...rest, max_score: Number(rest.max_score), group_id: rest.group_id ?? null }
+}
+
+/** ตาราง/คอลัมน์ยังไม่มี = ยังไม่ได้รัน migration กลุ่มคะแนน */
+function isMissingSchema(e: unknown) {
+  const code = (e as { code?: string } | null)?.code
+  return code === '42P01' || code === 'PGRST205' || code === '42703' || code === 'PGRST204'
 }
 function toSubmission(row: Submission & { assignments?: unknown }): Submission {
   const { assignments: _omit, ...rest } = row
@@ -218,7 +226,7 @@ export function createSupabaseApi(sb: SupabaseClient = getSupabase()): Api {
       const rows = ok(
         await sb
           .from('assignments')
-          .select(ASSIGNMENT_COLS)
+          .select('*')
           .eq('subject_id', subjectId)
           .order('due_date')
           .order('created_at'),
@@ -233,6 +241,36 @@ export function createSupabaseApi(sb: SupabaseClient = getSupabase()): Api {
     },
     async deleteAssignment(id) {
       ok(await sb.from('assignments').delete().eq('id', id))
+    },
+    async listTermAssignments(termId) {
+      const rows = await fetchAll<Assignment>((from, to) =>
+        sb.from('assignments').select('*, subjects!inner(term_id)').eq('subjects.term_id', termId).order('id').range(from, to),
+      )
+      return rows.map(toAssignment)
+    },
+
+    async listGroups(subjectId) {
+      const res = await sb.from('score_groups').select('id, subject_id, name, max_score, created_at').eq('subject_id', subjectId).order('created_at')
+      if (res.error && isMissingSchema(res.error)) return []
+      return (ok(res) as ScoreGroup[]).map((g) => ({ ...g, max_score: Number(g.max_score) }))
+    },
+    async saveGroup({ assignment_ids, ...input }, id) {
+      let groupId = id
+      if (groupId) {
+        ok(await sb.from('score_groups').update({ name: input.name, max_score: input.max_score }).eq('id', groupId))
+      } else {
+        const res = await sb.from('score_groups').insert(input).select('id').single<{ id: string }>()
+        if (res.error && isMissingSchema(res.error))
+          throw new Error('ยังไม่ได้เปิดใช้กลุ่มคะแนน: รันไฟล์ supabase/migrations/20261105000000_score_groups.sql ใน Supabase SQL Editor ก่อน')
+        groupId = ok(res).id
+      }
+      ok(await sb.from('assignments').update({ group_id: null }).eq('group_id', groupId))
+      for (const part of chunk(assignment_ids, ID_CHUNK)) {
+        ok(await sb.from('assignments').update({ group_id: groupId }).in('id', part))
+      }
+    },
+    async deleteGroup(id) {
+      ok(await sb.from('score_groups').delete().eq('id', id))
     },
 
     async listDueDates(subjectId) {
