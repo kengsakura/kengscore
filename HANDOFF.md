@@ -22,7 +22,7 @@ Vite 7 + React 19 + react-router 7 + TanStack Query 5 + Tailwind 4 + TypeScript,
   - env ตั้งแล้วทั้ง production/preview/development: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`
   - SSO protection = preview เท่านั้น (production เปิดสาธารณะ)
   - **เชื่อม Git แล้ว** กับ `kengsakura/kengscore` — push ขึ้น `main` = deploy production อัตโนมัติ, branch อื่น = preview
-  - project ชั่วคราว `kengscore-files` ใช้แค่อัปโหลดไฟล์ ลบทิ้งได้
+  - Vercel Cron เรียก `/api/keepalive` ทุกวัน 02:17 UTC (09:17 น. ไทย) กัน Supabase แพ็กเกจฟรี pause (ไฟล์ `api/keepalive.js`)
 - **Supabase:** https://efevwflmxvouactpobtj.supabase.co (ภูมิภาค Singapore)
   - ต้องรัน `supabase/migrations/20261103000000_init.sql` แล้วตามด้วย `20261104000000_student_portal.sql`
   - ตั้ง Auth → URL Configuration: Site URL = https://kengscore-ochre.vercel.app, Redirect = `https://kengscore-ochre.vercel.app/**`
