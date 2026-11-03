@@ -72,3 +72,29 @@ describe('access code', () => {
     expect(isValidAccessCode('K7M2')).toBe(false)
   })
 })
+
+describe('summarizeReport กับกลุ่มคะแนน', () => {
+  it('รวมคะแนนแบบเดียวกับหน้าครู', async () => {
+    const { summarizeReport } = await import('./report')
+    const asg = (id: string, raw: number | null, group_id: string | null) => ({
+      id, category: 'สมุด', title: id, max_score: 5, due_date: '2026-11-01', late_policy: null, created_at: id, group_id,
+      submission: raw == null ? null : { raw_score: raw, submitted_on: '2026-11-01', exempt: false },
+    })
+    const sum = summarizeReport(
+      {
+        student: { prefix: '', first_name: 'ก', last_name: '', number: 1, student_code: '', grade: 'ม.1', room: '1' },
+        term: { academic_year: 2569, semester: 2 },
+        teacher_name: '', school_name: '', categories: [],
+        late_policy: { mode: 'none', amount: 0, per: 'day', grace: 0, floor: 0, weekdaysOnly: true, round: 'none' },
+        subjects: [{
+          id: 's', code: '', name: 'วิชา', color: 'indigo', full_score: null,
+          groups: [{ id: 'g', name: 'สมุด', max_score: 20 }],
+          assignments: [asg('n1', 5, 'g'), asg('n2', null, 'g'), asg('w', 4, null)],
+        }],
+      },
+      '2026-11-02',
+    )
+    expect(sum.subjects[0].total).toBe(14)
+    expect(sum.subjects[0].maxTotal).toBe(25)
+  })
+})

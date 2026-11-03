@@ -1,5 +1,6 @@
 import type { ISODate, ReportAssignment, ReportSubject, StudentReport } from './api/types'
 import { computeScore, dayNumber, effectivePolicy, normalizePolicy, type ScoreResult } from './scoring'
+import { groupScore } from './gradebook'
 
 /** แปลงตัวเลขที่มาจาก JSON ให้เป็น number และเติมค่า default ของนโยบาย */
 export function normalizeReport(r: StudentReport): StudentReport {
@@ -10,6 +11,7 @@ export function normalizeReport(r: StudentReport): StudentReport {
     subjects: (r.subjects ?? []).map((s) => ({
       ...s,
       full_score: s.full_score == null ? null : Number(s.full_score),
+      groups: (s.groups ?? []).map((g) => ({ ...g, max_score: Number(g.max_score) })),
       assignments: (s.assignments ?? []).map((a) => ({
         ...a,
         max_score: Number(a.max_score),
@@ -82,8 +84,27 @@ export function summarizeReport(report: StudentReport, today: ISODate): ReportSu
       }
       return { assignment, subject, status: diff === 0 ? 'today' : 'upcoming', overdueDays: 0 }
     })
-    const total = round2(items.reduce((n, i) => n + (i.result?.final ?? 0), 0))
-    const maxTotal = items.reduce((n, i) => n + i.assignment.max_score, 0)
+    // คิดคะแนนรวมแบบเดียวกับหน้าคะแนนรวมของครู: กลุ่มคะแนน + งานเดี่ยว
+    const groups = new Map((subject.groups ?? []).map((g) => [g.id, g]))
+    const members = new Map<string, { final: number; max: number }[]>()
+    let total = 0
+    let maxTotal = 0
+    for (const i of items) {
+      const gid = i.assignment.group_id
+      const m = { final: i.result?.final ?? 0, max: i.assignment.max_score }
+      if (gid && groups.has(gid)) members.set(gid, [...(members.get(gid) ?? []), m])
+      else {
+        total += m.final
+        maxTotal += m.max
+      }
+    }
+    for (const [gid, list] of members) {
+      const g = groups.get(gid)!
+      total += groupScore(list, g.max_score)
+      maxTotal += g.max_score
+    }
+    total = round2(total)
+    maxTotal = round2(maxTotal)
     return {
       subject,
       items,

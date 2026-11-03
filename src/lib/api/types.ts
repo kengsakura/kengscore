@@ -146,6 +146,8 @@ export interface ReportSubject {
   name: string
   color: string
   full_score: number | null
+  /** กลุ่มคะแนนของวิชา (ไม่มี = ยังไม่ได้อัปเดตฟังก์ชันในฐานข้อมูล) */
+  groups?: { id: UUID; name: string; max_score: number }[]
   assignments: ReportAssignment[]
 }
 
@@ -158,6 +160,7 @@ export interface ReportAssignment {
   due_date: ISODate
   late_policy: LatePolicy | null
   created_at: string
+  group_id?: UUID | null
   submission: { raw_score: number; submitted_on: ISODate; exempt: boolean } | null
 }
 

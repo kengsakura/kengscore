@@ -52,7 +52,8 @@ export function buildFollowUp(
           if (scoreSubmission(sub, assignment, due, fallback).lateDays > 0) late++
           return
         }
-        const overdue = due <= today
+        // ครบกำหนดวันนี้ยังส่งได้ทันเวลา → ยังไม่นับว่าค้าง
+        const overdue = due < today
         if (!overdue && !includeNotDue) return
         n++
         missing.push({ subject: d.subject, assignment, due, overdue })

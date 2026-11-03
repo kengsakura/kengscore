@@ -25,6 +25,10 @@ describe('buildFollowUp', () => {
     expect(r.perSubject).toEqual([1, 0])
     expect(r.late).toBe(1)
   })
+  it('งานที่ครบกำหนดวันนี้ยังไม่นับว่าค้าง', () => {
+    const [r] = buildFollowUp([st], data, 'c', DEFAULT_LATE_POLICY, '2026-11-01', false)
+    expect(r.missing).toEqual([])
+  })
   it('รวมงานที่ยังไม่ถึงกำหนดเมื่อเลือก', () => {
     const [r] = buildFollowUp([st], data, 'c', DEFAULT_LATE_POLICY, '2026-11-05', true)
     expect(r.missing.map((m) => [m.assignment.id, m.overdue])).toEqual([['a1', true], ['a2', false]])
