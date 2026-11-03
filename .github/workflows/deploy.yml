@@ -1,0 +1,55 @@
+# Deploy ขึ้น Vercel อัตโนมัติทุกครั้งที่ push (ใช้แทนการเชื่อม GitHub กับ Vercel โดยตรง)
+# ต้องตั้ง secret ชื่อ VERCEL_TOKEN ใน GitHub: Settings → Secrets and variables → Actions
+name: Deploy to Vercel
+
+on:
+  push:
+    branches: [main, claude/festive-tesla-z84t6u]
+  workflow_dispatch:
+
+concurrency:
+  group: vercel-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: team_YOK5JzeKX67lUCfBwBZtgVLx
+      VERCEL_PROJECT_ID: prj_xDfch7KMy92ixISbbW0bwWhaELTP
+      HAS_TOKEN: ${{ secrets.VERCEL_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+      - name: ยังไม่ได้ตั้ง VERCEL_TOKEN
+        if: env.HAS_TOKEN != 'true'
+        run: echo "::warning::ข้ามการ deploy เพราะยังไม่มี secret VERCEL_TOKEN (ดู README หัวข้อ Deploy)"
+
+      # ดึง Environment Variables ของโปรเจกต์ (เช่น VITE_SUPABASE_URL) มาใช้ตอน build
+      - name: Pull Vercel settings
+        if: env.HAS_TOKEN == 'true'
+        run: npx --yes vercel@64.7.0 pull --yes --environment=production --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build
+        if: env.HAS_TOKEN == 'true'
+        run: npx --yes vercel@64.7.0 build --prod --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy
+        if: env.HAS_TOKEN == 'true'
+        run: |
+          url=$(npx --yes vercel@64.7.0 deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          echo "Deployed: $url" | tee -a "$GITHUB_STEP_SUMMARY"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

@@ -1,0 +1,39 @@
+{
+  "name": "kengscore",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "ระบบบันทึกคะแนนการส่งงานนักเรียน (React + Supabase)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:db": "bash scripts/test-db.sh",
+    "build:artifact": "node scripts/build-artifact.mjs"
+  },
+  "dependencies": {
+    "@fontsource/ibm-plex-sans-thai": "5.3.0",
+    "@supabase/supabase-js": "2.118.0",
+    "@tanstack/react-query": "5.105.3",
+    "clsx": "2.1.1",
+    "lucide-react": "0.577.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-router": "7.18.5",
+    "sonner": "2.0.8",
+    "uqr": "0.1.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.4",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "5.2.0",
+    "tailwindcss": "4.3.4",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vitest": "3.2.7"
+  }
+}
