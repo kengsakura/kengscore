@@ -21,7 +21,7 @@ Vite 7 + React 19 + react-router 7 + TanStack Query 5 + Tailwind 4 + TypeScript,
   - settings: framework vite, install `npm install`, build `npm run build`, output `dist`, Node 22.x
   - env ตั้งแล้วทั้ง production/preview/development: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`
   - SSO protection = preview เท่านั้น (production เปิดสาธารณะ)
-  - ยัง **ไม่ได้เชื่อม Git** — deploy ที่ผ่านมาทำผ่าน Vercel MCP (`create_deployment` แบบ inline files)
+  - **เชื่อม Git แล้ว** กับ `kengsakura/kengscore` — push ขึ้น `main` = deploy production อัตโนมัติ, branch อื่น = preview
   - project ชั่วคราว `kengscore-files` ใช้แค่อัปโหลดไฟล์ ลบทิ้งได้
 - **Supabase:** https://efevwflmxvouactpobtj.supabase.co (ภูมิภาค Singapore)
   - ต้องรัน `supabase/migrations/20261103000000_init.sql` แล้วตามด้วย `20261104000000_student_portal.sql`
@@ -29,8 +29,8 @@ Vite 7 + React 19 + react-router 7 + TanStack Query 5 + Tailwind 4 + TypeScript,
 
 ## GitHub
 - repo เดิม `sarawutjamornniam-coder/kengscore` — บัญชีโดน flag (repo ถูกซ่อน, Actions ใช้ไม่ได้, เชื่อม Vercel ไม่ได้)
-- ย้ายมา `kengsakura/kengscore` → งานถัดไป: เชื่อม Vercel project `kengscore` กับ repo นี้
-  (Vercel → kengscore → Settings → Git → Connect) แล้ว push ขึ้น `main` = deploy อัตโนมัติ
+- ย้ายมา `kengsakura/kengscore` และเชื่อมกับ Vercel project `kengscore` แล้ว (2026-11-03)
+- ลบ GitHub Actions `deploy.yml` ออกแล้ว เพราะ Vercel Git integration deploy ให้เอง
 
 ## คำสั่ง
 ```bash

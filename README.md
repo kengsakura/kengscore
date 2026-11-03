@@ -49,22 +49,17 @@
 
 ### 2) Deploy บน Vercel
 
-โปรเจกต์ `kengscore` ในทีม Sarawut สร้างไว้แล้ว (เปิดสาธารณะเฉพาะ production, preview ต้องล็อกอิน) เลือกวิธีใดวิธีหนึ่ง:
+โปรเจกต์ `kengscore` ในทีม Sarawut เชื่อมกับ GitHub repo `kengsakura/kengscore` แล้ว
+(เปิดสาธารณะเฉพาะ production, preview ต้องล็อกอิน)
 
-**แบบ A — เชื่อม GitHub กับ Vercel (แนะนำ deploy อัตโนมัติทุกครั้งที่ push)**
-ต้องใช้บัญชี GitHub ที่อนุญาตแอปภายนอกได้ → <https://vercel.com/new> → Import repository นี้
-(ถ้า GitHub แจ้งว่าบัญชีถูก flag ต้องขอปลดก่อนที่ <https://support.github.com>)
+- push ขึ้น `main` → deploy production อัตโนมัติ
+- push branch อื่น → ได้ preview deployment
 
-**แบบ B — deploy จากคอมพิวเตอร์ด้วย Vercel CLI (ไม่ต้องใช้ GitHub)**
-ติดตั้ง Node.js LTS จาก <https://nodejs.org> → ดาวน์โหลดโค้ด (GitHub → Code → Download ZIP) แล้วแตกไฟล์ →
-เปิด Terminal ในโฟลเดอร์นั้น แล้วรัน (ครั้งแรกจะให้ล็อกอิน Vercel และเลือกโปรเจกต์ `kengscore`)
+ถ้าต้องการ deploy จากเครื่องโดยตรง (ไม่ผ่าน GitHub):
 
 ```bash
 npx vercel@64.7.0 --prod
 ```
-
-**แบบ C — GitHub Actions** ไฟล์ [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) deploy ให้ทุกครั้งที่ push
-เมื่อมี secret `VERCEL_TOKEN` (สร้างที่ <https://vercel.com/account/tokens>) — ใช้ได้เมื่อบัญชี GitHub เปิดใช้ Actions ได้
 
 ค่า Supabase ใส่ที่ Vercel → Project kengscore → **Settings → Environment Variables** แล้ว deploy ใหม่
 
